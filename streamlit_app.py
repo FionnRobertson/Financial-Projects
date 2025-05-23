@@ -4,6 +4,87 @@ import plotly.figure_factory as ff
 import BC_Methods
 import random
 
+class BusinessCase:
+    total_baseline = 130000000
+    def __init__(self, retain_payroll_pct, stop_r, less_r, lower_r, stop_o, less_o, lower_o,
+                            pmo, load, sol_con, fin_eng, cola_fx, margin, np_pr_ratio, retain_nonpayroll_pct, save_r, save_o):
+        self.payroll_baseline = 100000000
+        self.retain_payroll_pct = retain_payroll_pct
+        self.stop_r = stop_r
+        self.less_r = less_r
+        self.lower_r = lower_r
+        self.stop_o = stop_o
+        self.less_o = less_o
+        self.lower_o = lower_o
+        self.pmo = pmo
+        self.load = load
+        self.sol_con = sol_con
+        self.fin_eng = fin_eng
+        self.cola_fx = cola_fx
+        self.margin = margin
+        self.np_pr_ratio = np_pr_ratio
+        self.retain_nonpayroll_pct = retain_nonpayroll_pct
+        self.save_r = save_r
+        self.save_o = save_o
+
+        self.nonpayroll_baseline = np_pr_ratio * self.payroll_baseline
+
+        self.payroll = calculate_payroll(self)
+        self.nonpayroll = calculate_nonpayroll(self)
+
+        self.total_new_cost = self.payroll + self.nonpayroll
+        self.total_savings = (self.total_baseline - self.total_new_cost)/ self.total_baseline
+
+def calculate_payroll(bc):
+    # Payroll
+    retain_payroll = bc.payroll_baseline * bc.retain_payroll_pct
+    net_retain = retain_payroll * (1-bc.stop_r)
+    net_retain = net_retain * (1-bc.less_r)
+    net_retain = net_retain * (1-bc.lower_r)
+    retain_saving_pct = (retain_payroll- net_retain)/retain_payroll
+
+    outsource_payroll = bc.payroll_baseline * (1-bc.retain_payroll_pct)
+    gross_outsource_unloaded_cost = outsource_payroll * (1-bc.stop_o)
+    gross_outsource_unloaded_cost = gross_outsource_unloaded_cost * (1-bc.less_o)
+    gross_outsource_unloaded_cost = gross_outsource_unloaded_cost * (1-bc.lower_o)
+    gross_outsource_saving_pct = (outsource_payroll - gross_outsource_unloaded_cost)/outsource_payroll
+
+    add_pmo = gross_outsource_unloaded_cost * bc.pmo
+    add_load =  (gross_outsource_unloaded_cost + add_pmo) * bc.load
+    add_sol_con = (gross_outsource_unloaded_cost + add_pmo + add_load) * bc.sol_con
+    add_cola = (gross_outsource_unloaded_cost + add_pmo + add_load + add_sol_con) * bc.cola_fx
+    add_fin_eng = (outsource_payroll* bc.fin_eng * 1.25) / 5
+    gross_outsource_loaded_cost = gross_outsource_unloaded_cost + add_cola + add_load + add_sol_con + add_fin_eng
+
+    net_outsource = gross_outsource_loaded_cost + (gross_outsource_loaded_cost / (1-bc.margin))-gross_outsource_loaded_cost
+    outsource_saving_pc = (outsource_payroll - net_outsource)/outsource_payroll
+
+    total_payroll_savings = bc.payroll_baseline - net_outsource - net_retain
+    total_payroll_savings_pct = total_payroll_savings/bc.payroll_baseline
+
+    total_p = bc.payroll_baseline - total_payroll_savings
+
+    return total_p
+
+def calculate_nonpayroll(bc):
+    # Non-payroll
+    retain_np = bc.retain_nonpayroll_pct * bc.nonpayroll_baseline
+    net_retained_np = retain_np * (1-bc.save_r)
+
+    outsource_non_payroll = (1-bc.retain_nonpayroll_pct) * bc.nonpayroll_baseline
+    gross_outsource_non_payroll = outsource_non_payroll * (1-bc.save_o)
+    add_np_cont = gross_outsource_non_payroll * bc.sol_con
+    add_np_load = (gross_outsource_non_payroll + add_np_cont) * bc.load
+    add_np_cola = (gross_outsource_non_payroll + add_np_cont + add_np_load) * bc.cola_fx
+    new_np_cost = gross_outsource_non_payroll + add_np_cola + add_np_load + add_np_cont
+    net_np_outsource_cost = (new_np_cost/(1-bc.margin))
+
+    total_np = net_retained_np + net_np_outsource_cost
+    total_savings_np = (bc.nonpayroll_baseline-total_np)
+    total_savings_np_pct = total_savings_np/bc.nonpayroll_baseline
+
+    return total_np
+
 # Function to build the plot
 def make_figure(data, names, colors):
     means = [np.mean(x) for x in data]
@@ -122,7 +203,7 @@ if submit:
     # Run 1000 business cases, with variables ranging within the values
     for i in range (1, 15000):
         dot_variables = [random.uniform(low, high) for (low, high) in variables]
-        x.append(BC_Methods.BusinessCase(*dot_variables).total_savings)
+        x.append(BusinessCase(*dot_variables).total_savings)
 
     # Add to session state
     st.session_state.results.append(x)
