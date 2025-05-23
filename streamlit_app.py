@@ -97,7 +97,7 @@ def make_figure(data, names, colors):
         )
         fig.add_annotation(
             x=means[index], y=1.1, yref="paper",
-            text=f"{names[index]} Mean: {means[index]:.0%}", showarrow=False,
+            text=f"{names[index]} {means[index]:.0%}", showarrow=False,
             font=dict(color=colors[index], size=13)
         )
 
